@@ -9,12 +9,15 @@
 </head>
 <body>
 <canvas id="field" aria-label="游戏地图；在屏幕任意空白处拖动以移动领主。电脑可用 WASD 或方向键。"></canvas>
+<div id="bootNotice" role="status" style="position:fixed;z-index:20;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90vw,350px);padding:19px 20px;background:#fff8e8;color:#334d3d;border:3px solid #c3a36d;border-radius:18px;box-shadow:0 10px 40px #243e3080;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;text-align:center;line-height:1.7"><b style="font-size:18px">🏰 奔奔王国</b><p style="margin:8px 0">正在载入游戏…</p><small>如果始终停留在这里，说明当前预览器不执行网页脚本。请用真正的浏览器打开，iPhone 推荐直接使用在线试玩链接，而不是「文件」App 的预览。</small></div>
 <div class="hud"><div class="top"><div class="lefttop"><div class="currency"><span class="coin">$</span><span id="gold">65</span><span style="font-size:12px;color:#e9d4a2;align-self:end;margin-bottom:2px">金币</span></div><div class="subhud" id="levelText">🏰 王国 Lv.1 · 已建 0 / 8</div></div><div class="righttop"><div class="phase" id="phase">☀️ 白昼 · 第 1 天<br><b>准备中</b></div><div class="hp">🏰 城堡 <span id="hp">100 / 100</span><div class="bar"><div id="hpbar"></div></div></div></div></div><div class="mission" id="mission"><div class="step">🏁 当前任务</div><b id="taskTitle">走向发光的建筑地基</b><p id="taskDesc">拖动屏幕移动，金币够了靠近后会自动建造。</p></div><div class="tools"><button class="tool" id="help" title="玩法说明" aria-label="玩法说明">?</button><button class="tool" id="pause" title="暂停" aria-label="暂停">Ⅱ</button><button class="tool" id="reset" title="重新开始" aria-label="重新开始">↻</button></div><div class="joy-guide" id="joyGuide">拖动移动</div><div class="toast" id="toast"></div><div class="foot" id="footer">🕹️ 拖动屏幕移动 · 靠近金币和地基自动交互</div></div>
 <div class="modalshade" id="shade" role="dialog" aria-modal="true"><div class="modal" id="modal"></div></div>
 <script>
 'use strict';
 (()=>{
 const canvas=document.getElementById('field'),ctx=canvas.getContext('2d',{alpha:false}),$=id=>document.getElementById(id);let CW=0,CH=0,DPR=1,scale=1,camX=0,camY=0;
+if(!ctx)throw new Error('当前预览器不支持 Canvas 2D');
+if(typeof ctx.roundRect!=='function'){ctx.roundRect=function(x,y,w,h,r){const rr=Math.max(0,Math.min(typeof r==='number'?r:12,Math.abs(w)/2,Math.abs(h)/2));this.moveTo(x+rr,y);this.lineTo(x+w-rr,y);this.quadraticCurveTo(x+w,y,x+w,y+rr);this.lineTo(x+w,y+h-rr);this.quadraticCurveTo(x+w,y+h,x+w-rr,y+h);this.lineTo(x+rr,y+h);this.quadraticCurveTo(x,y+h,x,y+h-rr);this.lineTo(x,y+rr);this.quadraticCurveTo(x,y,x+rr,y);return this;};}
 const WORLD={w:1450,h:1360},SAVEKEY='benben_roaming_offline_v2_20261018';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),rand=(a,b)=>a+Math.random()*(b-a),distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const defs=[
@@ -136,7 +139,7 @@ const idealX=clamp(S.x, CW/(2*scale),WORLD.w-CW/(2*scale)),idealY=clamp(S.y,CH/(
 ctx.save();ctx.translate(CW*.5,CH*.51);ctx.scale(scale,scale);ctx.translate(-camX+(shake>0?rand(-3,3):0),-camY+(shake>0?rand(-3,3):0));terrain();
 // Sort 2.5D entities by depth for convincing occlusion
 let objects=decor.map(d=>({y:d.y,draw:()=>drawTree(d)}));objects.push({y:756,draw:()=>castle(711,748)});for(const d of defs)objects.push({y:d.y,draw:()=>drawPad(d)});for(const e of enemies)if(!e.dead)objects.push({y:e.y,draw:()=>drawEnemy(e)});objects.push({y:S.y,draw:drawHero});objects.sort((a,b)=>a.y-b.y);
-drawCoins();for(const o of objects)o.draw();overlay();ctx.restore();drawJoystick()}
+drawCoins();for(const o of objects)o.draw();overlay();ctx.restore();drawJoystick();const boot=document.getElementById('bootNotice');if(boot)boot.style.display='none'}
 function lerp(a,b,t){return a+(b-a)*t}
 function drawJoystick(){if(!pointer.active)return;let x=pointer.startX,y=pointer.startY,dx=pointer.x-x,dy=pointer.y-y,d=Math.hypot(dx,dy),lim=54,r=d?Math.min(lim,d):0;ctx.save();ctx.globalAlpha=.88;circle(x,y,72,'#1e493b65');ctx.beginPath();ctx.strokeStyle='#fff9d7a0';ctx.lineWidth=2;ctx.arc(x,y,70,0,6.29);ctx.stroke();circle(x+dx/Math.max(1,d)*r,y+dy/Math.max(1,d)*r,29,'#fff4d1b8');circle(x+dx/Math.max(1,d)*r,y+dy/Math.max(1,d)*r,17,'#6ea57bc7');ctx.restore()}
 let raf=null;function frame(ts){let dt=Math.min(.052,(ts-last)/1000||.016);last=ts;if(!paused)tick(dt);draw();raf=requestAnimationFrame(frame)}
@@ -148,7 +151,7 @@ window.addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLe
 window.addEventListener('blur',()=>{pointer.active=false;keys={};save()});document.addEventListener('visibilitychange',()=>{if(document.hidden){pointer.active=false;keys={};save()}});window.addEventListener('beforeunload',save);
 function togglePause(){if(currentModal)return;modal('⏸️ 游戏已暂停','<p>你的王国、金币和建设进度都会自动保存。</p><div class="stat">当前第 '+S.wave+' 天 · 金币 '+Math.floor(S.gold)+' · 已消灭 '+S.kills+' 名叛军</div>',[{label:'继续漫游'}])}
 $('pause').onclick=togglePause;$('help').onclick=help;$('reset').onclick=()=>modal('确定重建王国？','<p>这将删除当前进度，包括金币、建筑、城堡耐久和波次。操作无法撤销。</p>',[{label:'取消，保留王国',secondary:true},{label:'确认，重新开始',action:()=>{try{localStorage.removeItem(SAVEKEY)}catch{};S=initial();enemies=[];coins=[];projectiles=[];particles=[];floating=[];holdId=null;needsExit=null;coinTimer=0;spawnRemaining=0;startSave();}}]);
-window.addEventListener('resize',resized);resized();startSave();camX=S.x;camY=S.y;last=performance.now();raf=requestAnimationFrame(frame);
+window.addEventListener('error',e=>{const boot=document.getElementById('bootNotice');if(boot){boot.style.display='block';boot.innerHTML='<b>游戏运行时遇到错误</b><p>请在 Safari 或 Chrome 中打开网页，勿使用文件预览器。</p>';}});window.addEventListener('resize',resized);resized();startSave();camX=S.x;camY=S.y;last=performance.now();raf=requestAnimationFrame(frame);
 // Non-network diagnostic hooks for offline smoke tests.
 window.__benbenDebug={snapshot:()=>JSON.parse(JSON.stringify(S)),move:(x,y)=>{S.x=x;S.y=y},addGold:n=>{S.gold+=n},tick:n=>{for(let i=0;i<n;i++)tick(.05)},build:d=>defs.find(v=>v.id===d),getEnemies:()=>enemies.length,getCoins:()=>coins.length,forceWave:()=>startWave(),save};
 })();
